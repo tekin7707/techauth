@@ -1,0 +1,241 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Management
+model User {
+  id                String    @id @default(uuid())
+  email             String?   @unique
+  emailVerified     Boolean   @default(false)
+  phoneNumber       String?   @unique
+  phoneVerified     Boolean   @default(false)
+  passwordHash      String?
+  
+  firstName         String?
+  lastName          String?
+  avatar            String?
+  locale            String    @default("en")
+  timezone          String?
+  
+  twoFactorEnabled  Boolean   @default(false)
+  twoFactorSecret   String?
+  
+  isActive          Boolean   @default(true)
+  isGlobalAdmin     Boolean   @default(false)
+  isBanned          Boolean   @default(false)
+  banReason         String?
+  
+  lastLoginAt       DateTime?
+  lastLoginIp       String?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  oauthProviders    OAuthProvider[]
+  sessions          Session[]
+  emailVerifications EmailVerification[]
+  phoneVerifications PhoneVerification[]
+  passwordResets    PasswordReset[]
+  projectMemberships ProjectMembership[]
+  loginHistory      LoginHistory[]
+  createdInvitations ProjectInvitation[] @relation("CreatedInvitations")
+  
+  @@index([email])
+  @@index([phoneNumber])
+}
+
+// OAuth Providers (Google, GitHub, Apple)
+model OAuthProvider {
+  id              String   @id @default(uuid())
+  userId          String
+  provider        String   // 'google', 'github', 'apple'
+  providerId      String   // ID from OAuth provider
+  accessToken     String?  @db.Text
+  refreshToken    String?  @db.Text
+  tokenExpiresAt  DateTime?
+  
+  profile         Json?    // Store provider profile data
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([provider, providerId])
+  @@index([userId])
+}
+
+// Session Management
+model Session {
+  id              String   @id @default(uuid())
+  userId          String
+  refreshToken    String   @unique @db.Text
+  
+  deviceInfo      Json?    // user agent, device type, etc.
+  ipAddress       String?
+  
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+  lastUsedAt      DateTime @default(now())
+  
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([refreshToken])
+  @@index([expiresAt])
+}
+
+// Email Verification
+model EmailVerification {
+  id              String   @id @default(uuid())
+  userId          String
+  email           String
+  token           String   @unique
+  expiresAt       DateTime
+  
+  verified        Boolean  @default(false)
+  verifiedAt      DateTime?
+  
+  createdAt       DateTime @default(now())
+  
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([token])
+  @@index([userId])
+}
+
+// Phone Verification (SMS & Telegram)
+model PhoneVerification {
+  id              String   @id @default(uuid())
+  userId          String
+  phoneNumber     String
+  code            String
+  method          String   // 'sms' or 'telegram'
+  
+  expiresAt       DateTime
+  attempts        Int      @default(0)
+  
+  verified        Boolean  @default(false)
+  verifiedAt      DateTime?
+  
+  createdAt       DateTime @default(now())
+  
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([phoneNumber])
+}
+
+// Password Reset
+model PasswordReset {
+  id              String   @id @default(uuid())
+  userId          String
+  token           String   @unique
+  expiresAt       DateTime
+  
+  used            Boolean  @default(false)
+  usedAt          DateTime?
+  
+  ipAddress       String?
+  
+  createdAt       DateTime @default(now())
+  
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([token])
+  @@index([userId])
+}
+
+// Multi-Tenant: Projects
+model Project {
+  id              String   @id @default(uuid())
+  name            String
+  slug            String   @unique
+  description     String?
+  
+  apiKey          String   @unique // Her proje için unique API key
+  apiSecret       String   // Hashed secret
+  
+  isActive        Boolean  @default(true)
+  
+  allowedOrigins  String[] // CORS için
+  webhookUrl      String?  // Auth events için webhook
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  memberships     ProjectMembership[]
+  usedInvitations ProjectInvitation[]
+  
+  @@index([apiKey])
+}
+
+// User-Project Relationship
+model ProjectMembership {
+  id              String   @id @default(uuid())
+  userId          String
+  projectId       String
+  
+  role            String   @default("user") // 'admin', 'user', 'guest'
+  permissions     Json?    // Custom permissions per project
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, projectId])
+  @@index([userId])
+  @@index([projectId])
+}
+
+// Login History & Audit
+model LoginHistory {
+  id              String   @id @default(uuid())
+  userId          String
+  
+  method          String   // 'password', 'google', 'github', 'apple'
+  success         Boolean
+  failureReason   String?
+  
+  ipAddress       String?
+  userAgent       String?  @db.Text
+  location        Json?    // country, city, etc.
+  
+  createdAt       DateTime @default(now())
+  
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([createdAt])
+}
+
+// Project Invitations
+model ProjectInvitation {
+  id              String   @id @default(uuid())
+  key             String   @unique // Invitation key
+  email           String   // Invitation is bound to this email
+  
+  description     String?  // Optional description (e.g. "For Client X")
+  
+  expiresAt       DateTime
+  used            Boolean  @default(false)
+  usedAt          DateTime?
+  
+  createdById     String
+  createdBy       User     @relation("CreatedInvitations", fields: [createdById], references: [id])
+  
+  usedByProjectId String?
+  usedByProject   Project? @relation(fields: [usedByProjectId], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([key])
+  @@index([createdById])
+}

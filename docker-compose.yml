@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ./techauthapi
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgresql://admin:Ta96121337!@db:5432/auth_service?schema=public
+      - APP_URL=http://api.teahauth.eu
+      - FRONTEND_URL=http://teahauth.eu
+    env_file:
+      - ./techauthapi/.env
+    depends_on:
+      - db
+    restart: always
+
+  frontend:
+    build:
+      context: ./techauthpanel
+      dockerfile: Dockerfile
+    ports:
+      - "3001:80"
+    restart: always
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=Ta96121337!
+      - POSTGRES_DB=auth_service
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - api
+      - frontend
+    restart: always
+
+volumes:
+  postgres_data:
