@@ -3,16 +3,13 @@ name: Deploy to VPS
 on:
   push:
     branches:
-      - prod
+      - release/prod
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
       - name: SSH to VPS and deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -22,6 +19,5 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script: |
             cd /home/deploy/app
-            git pull origin prod
-            docker compose down
+            git pull origin release/prod
             docker compose up -d --build
