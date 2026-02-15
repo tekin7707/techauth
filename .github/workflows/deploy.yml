@@ -20,4 +20,5 @@ jobs:
           script: |
             cd /home/deploy/app
             git pull origin release/prod
+            docker compose down
             docker compose up -d --build
