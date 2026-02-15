@@ -52,7 +52,7 @@ const Login = () => {
 
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
-                        <label>Email Address</label>
+                        <label>Email</label>
                         <div className="input-container">
                             <Mail className="input-icon" size={20} />
                             <input
