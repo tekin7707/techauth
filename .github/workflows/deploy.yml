@@ -21,4 +21,12 @@ jobs:
             cd /home/deploy/app
             git pull origin release/prod
             docker compose down
+
+            # Sertifikaları her seferinde güncel kopyala
+            mkdir -p ./nginx/certs/techauth.eu
+            cp /etc/letsencrypt/live/techauth.eu/fullchain.pem ./nginx/certs/techauth.eu/
+            cp /etc/letsencrypt/live/techauth.eu/privkey.pem   ./nginx/certs/techauth.eu/
+            chmod 644 ./nginx/certs/techauth.eu/fullchain.pem
+            chmod 600 ./nginx/certs/techauth.eu/privkey.pem
+
             docker compose up -d --build
